@@ -127,9 +127,10 @@ Resources:
             Effect: Allow
             Action:
               - ssm:GetParameter
+              - ssm:GetParameters
               - ssm:PutParameter
             Resource:
-              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/${Environment}/*
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/*
 
           - Sid: ReadCallerIdentity
             Effect: Allow
