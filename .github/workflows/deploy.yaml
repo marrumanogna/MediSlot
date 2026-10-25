@@ -29,7 +29,7 @@ concurrency:
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
   AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
-  ENVIRONMENT: ${{ vars.ENVIRONMENT || 'dev' }}
+  ENVIRONMENT: ${{ vars.ENVIRONMENT }}
   AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
 
 jobs:
@@ -83,7 +83,6 @@ jobs:
     if: github.ref == 'refs/heads/feature/milestone-2' && github.event_name != 'pull_request'
     needs: ci
     runs-on: ubuntu-latest
-    environment: dev
 
     steps:
       - name: Checkout repository
