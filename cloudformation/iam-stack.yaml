@@ -101,6 +101,12 @@ Resources:
               - lambda:RemovePermission
             Resource:
               - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:medislot-${Environment}-*
+          - Sid: InvokeMediSlotRdsConnectionCheck
+            Effect: Allow
+            Action:
+              - lambda:InvokeFunction
+            Resource:
+              - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:medislot-${Environment}-rds-connection-check
 
   # VPC/networking and S3 permissions
   MediSlotGitHubActionsNetworkS3Policy:
