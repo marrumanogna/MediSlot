@@ -29,46 +29,61 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Sid: ManageMediSlotChangeSets
+          - Sid: ManageMediSlotLambdaBasePolicy
             Effect: Allow
             Action:
-              - cloudformation:CreateChangeSet
-              - cloudformation:DescribeChangeSet
-              - cloudformation:ExecuteChangeSet
-              - cloudformation:DeleteChangeSet
-              - cloudformation:DeleteStack
-              - cloudformation:DescribeStacks
-              - cloudformation:DescribeStackEvents
-              - cloudformation:DescribeStackResources
-              - cloudformation:GetTemplate
+              - iam:CreatePolicy
+              - iam:DeletePolicy
+              - iam:GetPolicy
+              - iam:GetPolicyVersion
+              - iam:ListPolicyVersions
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicyVersion
+              - iam:SetDefaultPolicyVersion
+              - iam:ListEntitiesForPolicy
+              - iam:TagPolicy
+              - iam:UntagPolicy
+              - iam:ListPolicyTags
             Resource:
-              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/medislot-${Environment}-iam/*
-              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/medislot-${Environment}-network/*
-              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/medislot-${Environment}-data/*
-              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/medislot-${Environment}-auth/*
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/MediSlot-${Environment}-LambdaBasePolicy
 
-          - Sid: InspectCloudFormation
+          - Sid: ManageMediSlotAuthLambdaRoles
             Effect: Allow
             Action:
-              - cloudformation:ValidateTemplate
-              - cloudformation:DescribeStackResources
-            Resource: "*"
-
-          - Sid: ManageMediSlotSSMParameters
-            Effect: Allow
-            Action:
-              - ssm:GetParameter
-              - ssm:GetParameters
-              - ssm:PutParameter
-              - ssm:DeleteParameter
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:UpdateAssumeRolePolicy
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:PutRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:GetRolePolicy
+              - iam:ListRolePolicies
+              - iam:ListAttachedRolePolicies
             Resource:
-              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/*
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MediSlot-${Environment}-*Role
 
-          - Sid: ReadCallerIdentity
+          - Sid: AttachMediSlotLambdaBasePolicy
             Effect: Allow
             Action:
-              - sts:GetCallerIdentity
-            Resource: "*"
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MediSlot-${Environment}-*Role
+            Condition:
+              ArnEquals:
+                iam:PolicyARN: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/MediSlot-${Environment}-LambdaBasePolicy
+
+          - Sid: PassMediSlotAuthRolesToLambda
+            Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MediSlot-${Environment}-*Role
+            Condition:
+              StringEquals:
+                iam:PassedToService: lambda.amazonaws.com
 
   # VPC/networking and S3 permissions
   MediSlotGitHubActionsNetworkS3Policy:
