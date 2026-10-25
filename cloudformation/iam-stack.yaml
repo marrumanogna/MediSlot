@@ -53,7 +53,13 @@ Resources:
               - cloudformation:ValidateTemplate
               - cloudformation:DescribeStackResources
             Resource: "*"
-
+           - Sid: ConfigureApiGatewayCloudWatchAccount
+            Effect: Allow
+            Action:
+              - apigateway:PATCH
+              - apigateway:GET
+            Resource:
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/account
           - Sid: ReadCallerIdentity
             Effect: Allow
             Action:
@@ -82,9 +88,10 @@ Resources:
 
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
+    DependsOn:
+      - MediSlotGitHubActionsDeploymentPolicy
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
-
 
 Outputs:
   DeploymentRoleName:
