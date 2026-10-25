@@ -315,6 +315,17 @@ Resources:
               - apigateway:DELETE
             Resource:
               - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/*
+          - Sid: ManageMediSlotRestApis
+            Effect: Allow
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:PATCH
+              - apigateway:DELETE
+            Resource:
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/*
           - Sid: ManageApiGatewayCloudWatchRole
             Effect: Allow
             Action:
