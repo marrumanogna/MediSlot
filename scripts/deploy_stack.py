@@ -44,7 +44,8 @@ if exists:
         )
         exists = False
 
-kind = "UPDATE" if exists else "CREATE"name = f"m2-{uuid.uuid4().hex[:12]}"
+kind = "UPDATE" if exists else "CREATE"
+name = f"m2-{uuid.uuid4().hex[:12]}"
 cmd = ["cloudformation", "create-change-set", "--stack-name", stack_name,
        "--template-body", f"file://{template}", "--change-set-name", name,
        "--change-set-type", kind, "--capabilities", "CAPABILITY_NAMED_IAM",
