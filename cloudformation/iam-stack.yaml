@@ -156,6 +156,7 @@ Resources:
               - ssm:GetParameter
               - ssm:GetParameters
               - ssm:PutParameter
+              - ssm:DeleteParameter
             Resource:
               - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/*
           - Sid: ManageMediSlotDynamoDBTables
