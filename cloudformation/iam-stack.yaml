@@ -123,6 +123,13 @@ Resources:
               - iam:PassRole
             Resource:
               - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MediSlotApiGatewayCloudWatchRole
+          - Sid: ManageMediSlotSSMParameters
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:PutParameter
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/${Environment}/*
 
           - Sid: ReadCallerIdentity
             Effect: Allow
