@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-
+# MediSlot Milestone 2: IAM permissions for CI/CD deployment.
 Description: >
   MediSlot IAM deployment permissions managed as customer-managed
   policies to avoid the IAM inline-policy aggregate size limit.
