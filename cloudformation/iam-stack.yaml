@@ -2,8 +2,8 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
   MediSlot IAM deployment permissions for GitHub Actions,
-  including EC2 networking, RDS subnet groups, and the
-  regional API Gateway CloudWatch logging role.
+  including EC2 networking, RDS subnet groups, DynamoDB,
+  and the regional API Gateway CloudWatch logging role.
   Lambda execution roles remain managed by auth-stack.yaml.
 
 Parameters:
@@ -108,6 +108,19 @@ Resources:
               - rds:ListTagsForResource
             Resource:
               - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:subgrp:medislot-${Environment}-data-*
+
+          - Sid: ManageMediSlotAuthTokensTable
+            Effect: Allow
+            Action:
+              - dynamodb:CreateTable
+              - dynamodb:DescribeTable
+              - dynamodb:UpdateTable
+              - dynamodb:DeleteTable
+              - dynamodb:TagResource
+              - dynamodb:UntagResource
+              - dynamodb:ListTagsOfResource
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/MediSlot-${Environment}-AuthTokens
 
           - Sid: ConfigureApiGatewayCloudWatchAccount
             Effect: Allow
