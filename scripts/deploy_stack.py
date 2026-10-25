@@ -26,26 +26,47 @@ print(f"DEBUG describe_stacks_stderr={stack_info.stderr.strip()}")
 if exists:
     status = stack_info.stdout.strip()
 
-    if status in ("ROLLBACK_FAILED", "ROLLBACK_COMPLETE"):
-        print(f"Stack {stack_name} is in ROLLBACK_FAILED. Recovering automatically...")
-
+    # A REVIEW_IN_PROGRESS stack has not had its change set executed.
+    # Delete the empty stack record so it can be created correctly.
+    if status == "REVIEW_IN_PROGRESS":
+        print(
+            f"Stack {stack_name} is in REVIEW_IN_PROGRESS; "
+            "deleting the unexecuted stack record before recreation..."
+        )
         aws(
             "cloudformation", "delete-stack",
             "--stack-name", stack_name
         )
-
         aws(
             "cloudformation", "wait", "stack-delete-complete",
             "--stack-name", stack_name
         )
-
         exists = False
 
-    elif status in ("DELETE_IN_PROGRESS", "DELETE_COMPLETE"):
+    elif status in ("ROLLBACK_FAILED", "ROLLBACK_COMPLETE"):
+        print(
+            f"Stack {stack_name} is in {status}; "
+            "deleting it before recreation..."
+        )
+        aws(
+            "cloudformation", "delete-stack",
+            "--stack-name", stack_name
+        )
         aws(
             "cloudformation", "wait", "stack-delete-complete",
             "--stack-name", stack_name
         )
+        exists = False
+
+    elif status == "DELETE_IN_PROGRESS":
+        print(f"Stack {stack_name} is already being deleted; waiting...")
+        aws(
+            "cloudformation", "wait", "stack-delete-complete",
+            "--stack-name", stack_name
+        )
+        exists = False
+
+    elif status == "DELETE_COMPLETE":
         exists = False
 
 kind = "UPDATE" if exists else "CREATE"
