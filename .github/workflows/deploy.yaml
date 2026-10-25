@@ -113,6 +113,17 @@ jobs:
 
       - name: Verify OIDC identity
         run: aws sts get-caller-identity
+      - name: Verify deployment region and stacks
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Region: $AWS_REGION"
+          echo "Environment: $ENVIRONMENT"
+          aws sts get-caller-identity
+          aws cloudformation list-stacks \
+            --region "$AWS_REGION" \
+            --query "StackSummaries[?StackName=='medislot-dev-data'].[StackName,StackStatus]" \
+            --output table
 
       # The initial IAM bootstrap must be deployed by an authorized
       # AWS administrator before this step can run successfully.
