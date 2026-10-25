@@ -8,9 +8,43 @@ for pair in parameter_pairs:
     parameters.append({"ParameterKey": key, "ParameterValue": value})
 def aws(*args, check=True):
     return subprocess.run(["aws", *args, "--region", region], check=check, text=True, capture_output=True)
-exists = aws("cloudformation", "describe-stacks", "--stack-name", stack_name, check=False).returncode == 0
-kind = "UPDATE" if exists else "CREATE"
-name = f"m2-{uuid.uuid4().hex[:12]}"
+stack_info = aws(
+    "cloudformation",
+    "describe-stacks",
+    "--stack-name", stack_name,
+    "--query", "Stacks[0].StackStatus",
+    "--output", "text",
+    check=False
+)
+
+exists = stack_info.returncode == 0
+
+if exists:
+    status = stack_info.stdout.strip()
+
+    if status == "ROLLBACK_FAILED":
+        print(f"Stack {stack_name} is in ROLLBACK_FAILED. Recovering automatically...")
+
+        aws(
+            "cloudformation", "delete-stack",
+            "--stack-name", stack_name
+        )
+
+        aws(
+            "cloudformation", "wait", "stack-delete-complete",
+            "--stack-name", stack_name
+        )
+
+        exists = False
+
+    elif status in ("DELETE_IN_PROGRESS", "DELETE_COMPLETE"):
+        aws(
+            "cloudformation", "wait", "stack-delete-complete",
+            "--stack-name", stack_name
+        )
+        exists = False
+
+kind = "UPDATE" if exists else "CREATE"name = f"m2-{uuid.uuid4().hex[:12]}"
 cmd = ["cloudformation", "create-change-set", "--stack-name", stack_name,
        "--template-body", f"file://{template}", "--change-set-name", name,
        "--change-set-type", kind, "--capabilities", "CAPABILITY_NAMED_IAM",
