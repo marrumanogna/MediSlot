@@ -18,6 +18,10 @@ stack_info = aws(
 )
 
 exists = stack_info.returncode == 0
+print(f"DEBUG stack_name={stack_name}")
+print(f"DEBUG describe_stacks_returncode={stack_info.returncode}")
+print(f"DEBUG describe_stacks_stdout={stack_info.stdout.strip()}")
+print(f"DEBUG describe_stacks_stderr={stack_info.stderr.strip()}")
 
 if exists:
     status = stack_info.stdout.strip()
@@ -45,6 +49,7 @@ if exists:
         exists = False
 
 kind = "UPDATE" if exists else "CREATE"
+print(f"DEBUG change_set_type={kind}")
 name = f"m2-{uuid.uuid4().hex[:12]}"
 cmd = ["cloudformation", "create-change-set", "--stack-name", stack_name,
        "--template-body", f"file://{template}", "--change-set-name", name,
