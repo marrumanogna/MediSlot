@@ -2,10 +2,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
   MediSlot IAM deployment permissions for GitHub Actions,
-  including EC2 networking, S3 buckets, RDS subnet groups,
-  DynamoDB, SSM parameters, and the regional API Gateway
-  CloudWatch logging role. Lambda execution roles remain
-  managed by auth-stack.yaml.
+  including EC2 networking, S3 buckets, RDS database instances
+  and subnet groups, DynamoDB, SSM parameters, and API Gateway
+  CloudWatch logging. Lambda execution roles remain managed
+  by auth-stack.yaml.
 
 Parameters:
   Environment:
@@ -30,7 +30,7 @@ Resources:
         Version: "2012-10-17"
         Statement:
 
-          # CloudFormation stack deployment and recovery
+          # CloudFormation deployment and stack recovery
           - Sid: ManageMediSlotChangeSets
             Effect: Allow
             Action:
@@ -56,7 +56,7 @@ Resources:
               - cloudformation:DescribeStackResources
             Resource: "*"
 
-          # VPC, subnet, route table, security group and endpoint resources
+          # VPC, subnet, routes, security groups and VPC endpoints
           - Sid: ManageMediSlotNetworkResources
             Effect: Allow
             Action:
@@ -136,7 +136,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:s3:::medislot-${Environment}-*
 
-          # Objects uploaded to or downloaded from MediSlot buckets
+          # Files stored in MediSlot S3 buckets
           - Sid: ManageMediSlotS3Objects
             Effect: Allow
             Action:
@@ -162,7 +162,31 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:subgrp:medislot-${Environment}-data-*
 
-          # DynamoDB tables used by MediSlot
+          # RDS database creation
+          # CreateDBInstance requires a wildcard resource for creation.
+          - Sid: CreateMediSlotRDSInstances
+            Effect: Allow
+            Action:
+              - rds:CreateDBInstance
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref AWS::Region
+
+          # Describe and manage environment-specific RDS instances
+          - Sid: ManageMediSlotRDSInstances
+            Effect: Allow
+            Action:
+              - rds:DescribeDBInstances
+              - rds:ModifyDBInstance
+              - rds:DeleteDBInstance
+              - rds:AddTagsToResource
+              - rds:RemoveTagsFromResource
+              - rds:ListTagsForResource
+            Resource:
+              - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:db:medislot-${Environment}-*
+
+          # DynamoDB tables
           - Sid: ManageMediSlotDynamoDBTables
             Effect: Allow
             Action:
@@ -176,7 +200,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/MediSlot-${Environment}-*
 
-          # SSM parameters for database settings and application configuration
+          # SSM application and database parameters
           - Sid: ManageMediSlotSSMParameters
             Effect: Allow
             Action:
@@ -187,7 +211,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/*
 
-          # Regional API Gateway CloudWatch configuration
+          # Regional API Gateway CloudWatch settings
           - Sid: ConfigureApiGatewayCloudWatchAccount
             Effect: Allow
             Action:
@@ -196,7 +220,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/account
 
-          # IAM role used by API Gateway to publish logs
+          # API Gateway CloudWatch logging role
           - Sid: ManageApiGatewayCloudWatchRole
             Effect: Allow
             Action:
