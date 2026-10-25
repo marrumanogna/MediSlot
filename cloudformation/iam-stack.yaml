@@ -108,7 +108,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:medislot-${Environment}-rds-connection-check
 
-  # VPC/networking and S3 permissions
+  # VPC/networking and S3 permissionss
   MediSlotGitHubActionsNetworkS3Policy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
