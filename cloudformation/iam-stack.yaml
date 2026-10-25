@@ -111,7 +111,6 @@ Resources:
     Type: AWS::ApiGateway::Account
     DependsOn:
       - MediSlotGitHubActionsDeploymentPolicy
-      - ApiGatewayCloudWatchRole
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
