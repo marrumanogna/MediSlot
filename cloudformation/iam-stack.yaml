@@ -1,4 +1,3 @@
-
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
@@ -9,7 +8,6 @@ Description: >
 Parameters:
   Environment:
     Type: String
-    Default: dev
     AllowedValues:
       - dev
       - test
@@ -53,13 +51,35 @@ Resources:
               - cloudformation:ValidateTemplate
               - cloudformation:DescribeStackResources
             Resource: "*"
-           - Sid: ConfigureApiGatewayCloudWatchAccount
+
+          - Sid: ConfigureApiGatewayCloudWatchAccount
             Effect: Allow
             Action:
               - apigateway:PATCH
               - apigateway:GET
             Resource:
               - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/account
+
+          - Sid: ManageApiGatewayCloudWatchRole
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:GetRolePolicy
+              - iam:ListRolePolicies
+              - iam:ListAttachedRolePolicies
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:PutRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:UpdateAssumeRolePolicy
+              - iam:PassRole
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MediSlotApiGatewayCloudWatchRole
+
           - Sid: ReadCallerIdentity
             Effect: Allow
             Action:
@@ -68,6 +88,8 @@ Resources:
 
   ApiGatewayCloudWatchRole:
     Type: AWS::IAM::Role
+    DependsOn:
+      - MediSlotGitHubActionsDeploymentPolicy
     Properties:
       RoleName: MediSlotApiGatewayCloudWatchRole
       Description: Allows API Gateway to publish execution logs to CloudWatch.
@@ -85,11 +107,11 @@ Resources:
         - Key: Project
           Value: MediSlot
 
-
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
     DependsOn:
       - MediSlotGitHubActionsDeploymentPolicy
+      - ApiGatewayCloudWatchRole
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
@@ -105,4 +127,3 @@ Outputs:
   ApiGatewayCloudWatchRoleArn:
     Description: Regional API Gateway CloudWatch logging role.
     Value: !GetAtt ApiGatewayCloudWatchRole.Arn
-     
