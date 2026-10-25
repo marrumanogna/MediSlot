@@ -286,6 +286,7 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
+
           - Sid: ConfigureApiGatewayCloudWatchAccount
             Effect: Allow
             Action:
@@ -293,7 +294,27 @@ Resources:
               - apigateway:GET
             Resource:
               - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/account
+          - Sid: ManageMediSlotRestApis
+            Effect: Allow
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:PATCH
+              - apigateway:DELETE
+            Resource:
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/*
 
+          - Sid: ManageMediSlotApiGatewayTags
+            Effect: Allow
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:DELETE
+            Resource:
+              - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/*
           - Sid: ManageApiGatewayCloudWatchRole
             Effect: Allow
             Action:
