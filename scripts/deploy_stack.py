@@ -22,7 +22,7 @@ exists = stack_info.returncode == 0
 if exists:
     status = stack_info.stdout.strip()
 
-    if status == "ROLLBACK_FAILED":
+    if status in ("ROLLBACK_FAILED", "ROLLBACK_COMPLETE"):
         print(f"Stack {stack_name} is in ROLLBACK_FAILED. Recovering automatically...")
 
         aws(
