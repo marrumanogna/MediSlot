@@ -1,11 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 
 Description: >
-  MediSlot IAM deployment permissions for GitHub Actions,
-  including EC2 networking, S3 buckets, RDS database instances
-  and subnet groups, DynamoDB TTL and point-in-time recovery,
-  SSM parameters, and API Gateway CloudWatch logging.
-  Lambda execution roles remain managed by auth-stack.yaml.
+  MediSlot IAM deployment permissions managed as customer-managed
+  policies to avoid the IAM inline-policy aggregate size limit.
 
 Parameters:
   Environment:
@@ -20,17 +17,18 @@ Parameters:
     Default: MediSlotGitHubActionsRole
 
 Resources:
-  MediSlotGitHubActionsDeploymentPolicy:
-    Type: AWS::IAM::Policy
+
+  # Core CloudFormation, SSM and STS permissions
+  MediSlotGitHubActionsCorePolicy:
+    Type: AWS::IAM::ManagedPolicy
     Properties:
-      PolicyName: !Sub MediSlot-${Environment}-GitHubActionsDeploymentPolicy
+      ManagedPolicyName: !Sub MediSlot-${Environment}-GitHubActionsCorePolicy
+      Description: Core deployment and configuration permissions for MediSlot.
       Roles:
         - !Ref GitHubActionsRoleName
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-
-          # CloudFormation deployment and recovery
           - Sid: ManageMediSlotChangeSets
             Effect: Allow
             Action:
@@ -56,7 +54,33 @@ Resources:
               - cloudformation:DescribeStackResources
             Resource: "*"
 
-          # VPCs, subnets, route tables, security groups and endpoints
+          - Sid: ManageMediSlotSSMParameters
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:PutParameter
+              - ssm:DeleteParameter
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/*
+
+          - Sid: ReadCallerIdentity
+            Effect: Allow
+            Action:
+              - sts:GetCallerIdentity
+            Resource: "*"
+
+  # VPC/networking and S3 permissions
+  MediSlotGitHubActionsNetworkS3Policy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub MediSlot-${Environment}-GitHubActionsNetworkS3Policy
+      Description: Networking and MediSlot S3 bucket permissions.
+      Roles:
+        - !Ref GitHubActionsRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
           - Sid: ManageMediSlotNetworkResources
             Effect: Allow
             Action:
@@ -100,7 +124,6 @@ Resources:
               StringEquals:
                 aws:RequestedRegion: !Ref AWS::Region
 
-          # S3 bucket creation, configuration and cleanup
           - Sid: ManageMediSlotS3Buckets
             Effect: Allow
             Action:
@@ -136,7 +159,6 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:s3:::medislot-${Environment}-*
 
-          # Objects stored in MediSlot S3 buckets
           - Sid: ManageMediSlotS3Objects
             Effect: Allow
             Action:
@@ -148,7 +170,17 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:s3:::medislot-${Environment}-*/*
 
-          # RDS subnet groups
+  # RDS and DynamoDB permissions
+  MediSlotGitHubActionsDataPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub MediSlot-${Environment}-GitHubActionsDataPolicy
+      Description: RDS, DynamoDB, backup and service-linked role permissions.
+      Roles:
+        - !Ref GitHubActionsRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
           - Sid: ManageMediSlotRDSSubnetGroups
             Effect: Allow
             Action:
@@ -162,7 +194,6 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:subgrp:medislot-${Environment}-data-*
 
-          # RDS creation: limited to the deployment region
           - Sid: CreateMediSlotRDSInstances
             Effect: Allow
             Action:
@@ -172,11 +203,18 @@ Resources:
               StringEquals:
                 aws:RequestedRegion: !Ref AWS::Region
 
-          # Existing MediSlot RDS database instances
-          - Sid: ManageMediSlotRDSInstances
+          - Sid: DescribeMediSlotRDSInstances
             Effect: Allow
             Action:
               - rds:DescribeDBInstances
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref AWS::Region
+
+          - Sid: ManageMediSlotRDSInstances
+            Effect: Allow
+            Action:
               - rds:ModifyDBInstance
               - rds:DeleteDBInstance
               - rds:AddTagsToResource
@@ -185,7 +223,6 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:db:medislot-${Environment}-*
 
-          # RDS snapshots used for stack deletion and replacement
           - Sid: ManageMediSlotRDSSnapshots
             Effect: Allow
             Action:
@@ -196,7 +233,6 @@ Resources:
               StringEquals:
                 aws:RequestedRegion: !Ref AWS::Region
 
-          # Required RDS service-linked IAM role
           - Sid: CreateRDSServiceLinkedRole
             Effect: Allow
             Action:
@@ -207,7 +243,6 @@ Resources:
               StringLike:
                 iam:AWSServiceName: rds.amazonaws.com
 
-          # DynamoDB tables, TTL and point-in-time recovery
           - Sid: ManageMediSlotDynamoDBTables
             Effect: Allow
             Action:
@@ -225,18 +260,17 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/MediSlot-${Environment}-*
 
-          # SSM application and database parameters
-          - Sid: ManageMediSlotSSMParameters
-            Effect: Allow
-            Action:
-              - ssm:GetParameter
-              - ssm:GetParameters
-              - ssm:PutParameter
-              - ssm:DeleteParameter
-            Resource:
-              - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/*
-
-          # Regional API Gateway CloudWatch configuration
+  # API Gateway logging and its IAM role
+  MediSlotGitHubActionsApiGatewayPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub MediSlot-${Environment}-GitHubActionsApiGatewayPolicy
+      Description: API Gateway account configuration and logging role permissions.
+      Roles:
+        - !Ref GitHubActionsRoleName
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
           - Sid: ConfigureApiGatewayCloudWatchAccount
             Effect: Allow
             Action:
@@ -245,7 +279,6 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}::/account
 
-          # API Gateway CloudWatch logging role
           - Sid: ManageApiGatewayCloudWatchRole
             Effect: Allow
             Action:
@@ -266,16 +299,10 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/MediSlotApiGatewayCloudWatchRole
 
-          - Sid: ReadCallerIdentity
-            Effect: Allow
-            Action:
-              - sts:GetCallerIdentity
-            Resource: "*"
-
   ApiGatewayCloudWatchRole:
     Type: AWS::IAM::Role
     DependsOn:
-      - MediSlotGitHubActionsDeploymentPolicy
+      - MediSlotGitHubActionsApiGatewayPolicy
     Properties:
       RoleName: MediSlotApiGatewayCloudWatchRole
       Description: Allows API Gateway to publish execution logs to CloudWatch.
@@ -296,19 +323,27 @@ Resources:
   ApiGatewayAccount:
     Type: AWS::ApiGateway::Account
     DependsOn:
-      - MediSlotGitHubActionsDeploymentPolicy
+      - MediSlotGitHubActionsApiGatewayPolicy
     Properties:
       CloudWatchRoleArn: !GetAtt ApiGatewayCloudWatchRole.Arn
 
 Outputs:
   DeploymentRoleName:
-    Description: GitHub Actions deployment role receiving the policy.
+    Description: GitHub Actions deployment role receiving the policies.
     Value: !Ref GitHubActionsRoleName
 
-  DeploymentPolicyName:
-    Description: Name of the attached deployment policy.
-    Value: !Ref MediSlotGitHubActionsDeploymentPolicy
+  CorePolicyArn:
+    Description: Core deployment permissions policy ARN.
+    Value: !Ref MediSlotGitHubActionsCorePolicy
 
-  ApiGatewayCloudWatchRoleArn:
-    Description: Regional API Gateway CloudWatch logging role.
-    Value: !GetAtt ApiGatewayCloudWatchRole.Arn
+  NetworkS3PolicyArn:
+    Description: Networking and S3 permissions policy ARN.
+    Value: !Ref MediSlotGitHubActionsNetworkS3Policy
+
+  DataPolicyArn:
+    Description: RDS and DynamoDB permissions policy ARN.
+    Value: !Ref MediSlotGitHubActionsDataPolicy
+
+  ApiGatewayPolicyArn:
+    Description: API Gateway permissions policy ARN.
+    Value: !Ref MediSlotGitHubActionsApiGatewayPolicy
