@@ -3,9 +3,9 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   MediSlot IAM deployment permissions for GitHub Actions,
   including EC2 networking, S3 buckets, RDS database instances
-  and subnet groups, DynamoDB, SSM parameters, and API Gateway
-  CloudWatch logging. Lambda execution roles remain managed
-  by auth-stack.yaml.
+  and subnet groups, DynamoDB TTL and point-in-time recovery,
+  SSM parameters, and API Gateway CloudWatch logging.
+  Lambda execution roles remain managed by auth-stack.yaml.
 
 Parameters:
   Environment:
@@ -56,7 +56,7 @@ Resources:
               - cloudformation:DescribeStackResources
             Resource: "*"
 
-          # VPC, subnets, route tables, security groups and endpoints
+          # VPCs, subnets, route tables, security groups and endpoints
           - Sid: ManageMediSlotNetworkResources
             Effect: Allow
             Action:
@@ -100,7 +100,7 @@ Resources:
               StringEquals:
                 aws:RequestedRegion: !Ref AWS::Region
 
-          # S3 bucket management
+          # S3 bucket creation, configuration and cleanup
           - Sid: ManageMediSlotS3Buckets
             Effect: Allow
             Action:
@@ -136,7 +136,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:s3:::medislot-${Environment}-*
 
-          # Objects in MediSlot buckets
+          # Objects stored in MediSlot S3 buckets
           - Sid: ManageMediSlotS3Objects
             Effect: Allow
             Action:
@@ -162,7 +162,7 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:subgrp:medislot-${Environment}-data-*
 
-          # RDS instance creation, restricted to the deployment region
+          # RDS creation: limited to the deployment region
           - Sid: CreateMediSlotRDSInstances
             Effect: Allow
             Action:
@@ -172,7 +172,7 @@ Resources:
               StringEquals:
                 aws:RequestedRegion: !Ref AWS::Region
 
-          # RDS instance descriptions and lifecycle management
+          # Existing MediSlot RDS database instances
           - Sid: ManageMediSlotRDSInstances
             Effect: Allow
             Action:
@@ -185,7 +185,18 @@ Resources:
             Resource:
               - !Sub arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:db:medislot-${Environment}-*
 
-          # Allow RDS to create its service-linked role
+          # RDS snapshots used for stack deletion and replacement
+          - Sid: ManageMediSlotRDSSnapshots
+            Effect: Allow
+            Action:
+              - rds:CreateDBSnapshot
+              - rds:DescribeDBSnapshots
+            Resource: "*"
+            Condition:
+              StringEquals:
+                aws:RequestedRegion: !Ref AWS::Region
+
+          # Required RDS service-linked IAM role
           - Sid: CreateRDSServiceLinkedRole
             Effect: Allow
             Action:
@@ -196,7 +207,7 @@ Resources:
               StringLike:
                 iam:AWSServiceName: rds.amazonaws.com
 
-          # DynamoDB tables
+          # DynamoDB tables, TTL and point-in-time recovery
           - Sid: ManageMediSlotDynamoDBTables
             Effect: Allow
             Action:
@@ -207,6 +218,10 @@ Resources:
               - dynamodb:TagResource
               - dynamodb:UntagResource
               - dynamodb:ListTagsOfResource
+              - dynamodb:DescribeTimeToLive
+              - dynamodb:UpdateTimeToLive
+              - dynamodb:DescribeContinuousBackups
+              - dynamodb:UpdateContinuousBackups
             Resource:
               - !Sub arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/MediSlot-${Environment}-*
 
