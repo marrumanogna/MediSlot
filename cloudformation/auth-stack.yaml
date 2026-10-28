@@ -298,6 +298,55 @@ Resources:
         Variables:
           ENVIRONMENT: !Ref Environment
           DOCTOR_PHOTOS_BUCKET: !Ref DoctorPhotosBucketName
+  ConsultationTypesFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'medislot-${Environment}-consultation-types'
+      Runtime: python3.12
+      Handler: lambda_function.handler
+      Role: !GetAtt DoctorProfileRole.Arn
+      Timeout: 15
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref ArtifactBucket
+        S3Key: !Sub '${ArtifactPrefix}/consultation_types.zip'
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+              Fn::Sub: 'MediSlot-${Environment}-LambdaSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+              Fn::Sub: 'MediSlot-${Environment}-PrivateSubnet1Id'
+          - !ImportValue
+              Fn::Sub: 'MediSlot-${Environment}-PrivateSubnet2Id'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+
+  AvailabilityPatternsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'medislot-${Environment}-availability-patterns'
+      Runtime: python3.12
+      Handler: lambda_function.handler
+      Role: !GetAtt DoctorProfileRole.Arn
+      Timeout: 15
+      MemorySize: 256
+      Code:
+        S3Bucket: !Ref ArtifactBucket
+        S3Key: !Sub '${ArtifactPrefix}/availability_patterns.zip'
+      VpcConfig:
+        SecurityGroupIds:
+          - !ImportValue
+              Fn::Sub: 'MediSlot-${Environment}-LambdaSecurityGroupId'
+        SubnetIds:
+          - !ImportValue
+              Fn::Sub: 'MediSlot-${Environment}-PrivateSubnet1Id'
+          - !ImportValue
+              Fn::Sub: 'MediSlot-${Environment}-PrivateSubnet2Id'
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
   ProtectedFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -453,6 +502,189 @@ Resources:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DoctorProfileFunction.Arn}/invocations'
+  ConsultationTypesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref DoctorResource
+      PathPart: consultation-types
+
+  ConsultationTypeIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ConsultationTypesResource
+      PathPart: '{type_id}'
+
+  AvailabilityPatternsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref DoctorResource
+      PathPart: availability-patterns
+
+  AvailabilityPatternIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref AvailabilityPatternsResource
+      PathPart: '{pattern_id}'
+  ConsultationTypesGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ConsultationTypesResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConsultationTypesFunction.Arn}/invocations'
+
+  ConsultationTypesPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ConsultationTypesResource
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConsultationTypesFunction.Arn}/invocations'
+
+  ConsultationTypeIdGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ConsultationTypeIdResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConsultationTypesFunction.Arn}/invocations'
+
+  ConsultationTypeIdPutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ConsultationTypeIdResource
+      HttpMethod: PUT
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConsultationTypesFunction.Arn}/invocations'
+
+  ConsultationTypeIdPatchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ConsultationTypeIdResource
+      HttpMethod: PATCH
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConsultationTypesFunction.Arn}/invocations'
+
+  ConsultationTypeIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ConsultationTypeIdResource
+      HttpMethod: DELETE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ConsultationTypesFunction.Arn}/invocations'
+
+  AvailabilityPatternsGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref AvailabilityPatternsResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AvailabilityPatternsFunction.Arn}/invocations'
+
+  AvailabilityPatternsPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref AvailabilityPatternsResource
+      HttpMethod: POST
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AvailabilityPatternsFunction.Arn}/invocations'
+
+  AvailabilityPatternIdGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref AvailabilityPatternIdResource
+      HttpMethod: GET
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AvailabilityPatternsFunction.Arn}/invocations'
+
+  AvailabilityPatternIdPutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref AvailabilityPatternIdResource
+      HttpMethod: PUT
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AvailabilityPatternsFunction.Arn}/invocations'
+
+  AvailabilityPatternIdPatchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref AvailabilityPatternIdResource
+      HttpMethod: PATCH
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AvailabilityPatternsFunction.Arn}/invocations'
+
+  AvailabilityPatternIdDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref AvailabilityPatternIdResource
+      HttpMethod: DELETE
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AvailabilityPatternsFunction.Arn}/invocations'
+
   PatientRegisterResource:
     Type: AWS::ApiGateway::Resource
     Properties: {RestApiId: !Ref RestApi, ParentId: !GetAtt RestApi.RootResourceId, PathPart: auth}
@@ -540,6 +772,21 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/doctor/profile*'
+  ConsultationTypesInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ConsultationTypesFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/doctor/consultation-types*'
+
+  AvailabilityPatternsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AvailabilityPatternsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*/doctor/availability-patterns*'
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
@@ -556,6 +803,18 @@ Resources:
       - LoginMethod
       - RefreshMethod
       - LogoutMethod
+      - ConsultationTypesGetMethod
+      - ConsultationTypesPostMethod
+      - ConsultationTypeIdGetMethod
+      - ConsultationTypeIdPutMethod
+      - ConsultationTypeIdPatchMethod
+      - ConsultationTypeIdDeleteMethod
+      - AvailabilityPatternsGetMethod
+      - AvailabilityPatternsPostMethod
+      - AvailabilityPatternIdGetMethod
+      - AvailabilityPatternIdPutMethod
+      - AvailabilityPatternIdPatchMethod
+      - AvailabilityPatternIdDeleteMethod
     Properties:
       RestApiId: !Ref RestApi
       Description: !Sub 'MediSlot ${Environment} auth API deployment'

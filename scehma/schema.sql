@@ -36,3 +36,45 @@ CREATE TABLE IF NOT EXISTS doctor_profiles (
   CONSTRAINT chk_doctor_fee
     CHECK (consultation_fee IS NULL OR consultation_fee >= 0)
 ) ENGINE=InnoDB;
+-- Consultation types offered by doctors
+CREATE TABLE IF NOT EXISTS consultation_types (
+  consultation_type_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  description VARCHAR(500) NULL,
+  duration_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+  fee DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+    ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (consultation_type_id),
+  UNIQUE KEY uq_consultation_type_doctor_name (doctor_id, name),
+  CONSTRAINT fk_consultation_type_doctor
+    FOREIGN KEY (doctor_id) REFERENCES doctor_profiles(user_id)
+    ON DELETE CASCADE,
+  CONSTRAINT chk_consultation_duration
+    CHECK (duration_minutes BETWEEN 5 AND 480),
+  CONSTRAINT chk_consultation_fee CHECK (fee >= 0)
+) ENGINE=InnoDB;
+
+-- Recurring weekly doctor availability
+CREATE TABLE IF NOT EXISTS availability_patterns (
+  pattern_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  day_of_week TINYINT UNSIGNED NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  timezone VARCHAR(64) NOT NULL DEFAULT 'UTC',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+    ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (pattern_id),
+  KEY ix_availability_doctor_day (doctor_id, day_of_week, is_active),
+  CONSTRAINT fk_availability_doctor
+    FOREIGN KEY (doctor_id) REFERENCES doctor_profiles(user_id)
+    ON DELETE CASCADE,
+  CONSTRAINT chk_availability_day CHECK (day_of_week BETWEEN 0 AND 6),
+  CONSTRAINT chk_availability_time CHECK (start_time < end_time)
+) ENGINE=InnoDB;
