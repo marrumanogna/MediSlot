@@ -4,6 +4,7 @@ name: MediSlot Milestone 2 CI and Deployment
 on:
   pull_request:
     branches: [master]
+
   push:
     branches: [feature/milestone-2]
     paths:
@@ -15,7 +16,14 @@ on:
       - "requirements-dev.txt"
       - "README.md"
       - "schema/**"
+
   workflow_dispatch:
+    inputs:
+      recover_failed_data_stack:
+        description: "Permanently delete artifact versions to recover a DELETE_FAILED data stack"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -27,8 +35,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
-  AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   ENVIRONMENT: ${{ vars.ENVIRONMENT }}
   AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN || secrets.AWS_DEPLOY_ROLE_ARN }}
 
@@ -54,12 +62,12 @@ jobs:
 
       - name: Unit tests
         env:
-          AWS_REGION: ap-south-1
-          AWS_DEFAULT_REGION: ap-south-1
+          AWS_REGION: us-east-1
+          AWS_DEFAULT_REGION: us-east-1
         run: pytest -q
 
       - name: Python syntax check
-        run: python -m compileall -q lambdas tests
+        run: python -m compileall -q lambdas tests scripts
 
       - name: Validate CloudFormation templates
         run: |
@@ -105,6 +113,11 @@ jobs:
             exit 1
           fi
 
+          if [[ -z "$ENVIRONMENT" ]]; then
+            echo "::error::Set the ENVIRONMENT repository variable, for example dev."
+            exit 1
+          fi
+
       - name: Configure AWS credentials with OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -113,16 +126,20 @@ jobs:
 
       - name: Verify OIDC identity
         run: aws sts get-caller-identity
+
       - name: Verify deployment region and stacks
         shell: bash
         run: |
           set -euo pipefail
+
           echo "Region: $AWS_REGION"
           echo "Environment: $ENVIRONMENT"
+
           aws sts get-caller-identity
+
           aws cloudformation list-stacks \
             --region "$AWS_REGION" \
-            --query "StackSummaries[?StackName=='medislot-dev-data'].[StackName,StackStatus]" \
+            --query "StackSummaries[?StackName=='medislot-${ENVIRONMENT}-data'].[StackName,StackStatus]" \
             --output table
 
       # The initial IAM bootstrap must be deployed by an authorized
@@ -185,6 +202,110 @@ jobs:
 
             unset JWT_SECRET
           fi
+
+      # Destructive recovery is possible only when manually requested
+      # through workflow_dispatch. Ordinary pushes cannot purge artifacts.
+      - name: Recover DELETE_FAILED data stack
+        if: github.event_name == 'workflow_dispatch' && inputs.recover_failed_data_stack == true
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          STACK="medislot-${ENVIRONMENT}-data"
+          ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
+          EXPECTED_BUCKET="medislot-${ENVIRONMENT}-artifacts-${ACCOUNT}"
+
+          STATUS="$(aws cloudformation describe-stacks \
+            --stack-name "$STACK" \
+            --region "$AWS_REGION" \
+            --query 'Stacks[0].StackStatus' \
+            --output text)"
+
+          if [[ "$STATUS" != "DELETE_FAILED" ]]; then
+            echo "Stack status is $STATUS; no recovery cleanup is needed."
+            exit 0
+          fi
+
+          BUCKET="$(aws cloudformation list-stack-resources \
+            --stack-name "$STACK" \
+            --region "$AWS_REGION" \
+            --query "StackResourceSummaries[?LogicalResourceId=='ArtifactBucket' && ResourceType=='AWS::S3::Bucket'].PhysicalResourceId | [0]" \
+            --output text)"
+
+          if [[ "$BUCKET" != "$EXPECTED_BUCKET" ]]; then
+            echo "::error::Artifact bucket does not match the expected bucket. Refusing cleanup."
+            exit 1
+          fi
+
+          echo "::warning::This permanently deletes every object version and delete marker in s3://${BUCKET}."
+
+          # Install boto3 for fully paginated version cleanup.
+          pip install boto3
+
+          BUCKET="$BUCKET" python - <<'PY'
+          import os
+          import sys
+          import boto3
+
+          bucket = os.environ["BUCKET"]
+          s3 = boto3.client("s3")
+          paginator = s3.get_paginator("list_object_versions")
+
+          # First collect all versions and markers using pagination.
+          # No deletion occurs until the listing has completed.
+          objects = []
+
+          for page in paginator.paginate(Bucket=bucket):
+              for item in page.get("Versions", []):
+                  objects.append({
+                      "Key": item["Key"],
+                      "VersionId": item["VersionId"],
+                  })
+
+              for item in page.get("DeleteMarkers", []):
+                  objects.append({
+                      "Key": item["Key"],
+                      "VersionId": item["VersionId"],
+                  })
+
+          print(f"Found {len(objects)} versions and delete markers.")
+
+          # S3 accepts at most 1000 entries per delete request.
+          for start in range(0, len(objects), 1000):
+              batch = objects[start:start + 1000]
+              response = s3.delete_objects(
+                  Bucket=bucket,
+                  Delete={"Objects": batch, "Quiet": True},
+              )
+
+              errors = response.get("Errors", [])
+              if errors:
+                  print(f"Deletion failed: {errors}", file=sys.stderr)
+                  sys.exit(1)
+
+          # Verify the bucket is empty of versions and markers.
+          remaining = False
+          for page in paginator.paginate(Bucket=bucket):
+              if page.get("Versions") or page.get("DeleteMarkers"):
+                  remaining = True
+                  break
+
+          if remaining:
+              print("Bucket still contains versions or markers.", file=sys.stderr)
+              sys.exit(1)
+
+          print("All object versions and delete markers were removed.")
+          PY
+
+          aws cloudformation delete-stack \
+            --stack-name "$STACK" \
+            --region "$AWS_REGION"
+
+          aws cloudformation wait stack-delete-complete \
+            --stack-name "$STACK" \
+            --region "$AWS_REGION"
+
+          echo "Failed data stack deleted. The next step can recreate it."
 
       - name: Deploy data stack
         shell: bash

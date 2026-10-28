@@ -7,6 +7,7 @@ Parameters:
     AllowedValues: [dev, test, prod]
   ArtifactBucket: {Type: String}
   ArtifactPrefix: {Type: String}
+
 Resources:
   LambdaExecutionBasePolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -24,6 +25,7 @@ Resources:
           - Effect: Allow
             Action: [ec2:CreateNetworkInterface, ec2:DescribeNetworkInterfaces, ec2:DeleteNetworkInterface, ec2:AssignPrivateIpAddresses, ec2:UnassignPrivateIpAddresses]
             Resource: '*'
+            
   RegisterRole:
     Type: AWS::IAM::Role
     Properties:
@@ -37,6 +39,7 @@ Resources:
             Statement:
               - {Effect: Allow, Action: [ssm:GetParameter], Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/${Environment}/*'}
               - {Effect: Allow, Action: [kms:Decrypt], Resource: '*'}
+
   DoctorRegisterRole:
     Type: AWS::IAM::Role
     Properties:
@@ -106,6 +109,7 @@ Resources:
               - {Effect: Allow, Action: [ssm:GetParameter], Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/medislot/${Environment}/auth/jwt-secret'}
               - {Effect: Allow, Action: [dynamodb:GetItem], Resource: !Sub 'arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/MediSlot-${Environment}-AuthTokens'}
               - {Effect: Allow, Action: [kms:Decrypt], Resource: '*'}
+
   RegisterFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -122,6 +126,7 @@ Resources:
           - Fn::ImportValue: !Sub 'MediSlot-${Environment}-PrivateSubnet1Id'
           - Fn::ImportValue: !Sub 'MediSlot-${Environment}-PrivateSubnet2Id'
       Environment: {Variables: {ENVIRONMENT: !Ref Environment, ROLE: PATIENT}}
+      
   DoctorRegisterFunction:
     Type: AWS::Lambda::Function
     Properties:
