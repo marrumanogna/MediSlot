@@ -1,4 +1,4 @@
--- MediSlot Milestone 2 identity schema.
+﻿-- MediSlot Milestone 2 identity schema.
 -- Runtime uses InnoDB, stores UTC timestamps, and never stores plaintext passwords.
 CREATE TABLE IF NOT EXISTS users (
   user_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -77,4 +77,38 @@ CREATE TABLE IF NOT EXISTS availability_patterns (
     ON DELETE CASCADE,
   CONSTRAINT chk_availability_day CHECK (day_of_week BETWEEN 0 AND 6),
   CONSTRAINT chk_availability_time CHECK (start_time < end_time)
+) ENGINE=InnoDB;
+-- Dates when a doctor is unavailable
+CREATE TABLE IF NOT EXISTS doctor_blackout_dates (
+  blackout_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  blackout_date DATE NOT NULL,
+  reason VARCHAR(255) NULL,
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (blackout_id),
+  UNIQUE KEY uq_doctor_blackout_date (doctor_id, blackout_date),
+  CONSTRAINT fk_blackout_doctor
+    FOREIGN KEY (doctor_id) REFERENCES doctor_profiles(user_id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB;
+-- Generated appointment slots
+CREATE TABLE IF NOT EXISTS appointment_slots (
+  slot_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  doctor_id BIGINT UNSIGNED NOT NULL,
+  consultation_type_id BIGINT UNSIGNED NOT NULL,
+  slot_start DATETIME NOT NULL,
+  slot_end DATETIME NOT NULL,
+  status ENUM('AVAILABLE','BOOKED','BLOCKED') NOT NULL DEFAULT 'AVAILABLE',
+  created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (slot_id),
+  UNIQUE KEY uq_doctor_slot (doctor_id, consultation_type_id, slot_start),
+  KEY ix_slots_lookup (doctor_id, status, slot_start),
+  CONSTRAINT fk_slot_doctor
+    FOREIGN KEY (doctor_id) REFERENCES doctor_profiles(user_id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_slot_consultation_type
+    FOREIGN KEY (consultation_type_id)
+    REFERENCES consultation_types(consultation_type_id)
+    ON DELETE CASCADE,
+  CONSTRAINT chk_slot_time CHECK (slot_start < slot_end)
 ) ENGINE=InnoDB;
