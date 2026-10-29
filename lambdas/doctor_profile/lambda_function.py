@@ -500,6 +500,8 @@ def handler(event, context):
         )
 
     except Exception:
+        import logging
+        logging.exception("doctor_profile_failed: unexpected exception")
         emit(
             "error",
             "doctor_profile_failed",
