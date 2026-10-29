@@ -219,7 +219,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub 'medislot-${Environment}-artifacts-v2-${AWS::AccountId}'
+      BucketName: !Sub 'medislot-${Environment}-artifacts-v3-${AWS::AccountId}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
