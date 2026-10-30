@@ -12,8 +12,14 @@ def handler(event, context):
     conn = None
 
     try:
-        role = os.environ["ROLE"]
+        role = os.environ["ROLE"].upper()
         data = body(event)
+
+        if role not in ("DOCTOR", "PATIENT"):
+            return response(500, {
+                "message": "Invalid registration configuration",
+                "correlationId": cid
+            })
 
         if not isinstance(data, dict):
             return response(400, {
@@ -21,29 +27,22 @@ def handler(event, context):
                 "correlationId": cid
             })
 
-        # -----------------------------
         # 1. Account details
-        # -----------------------------
         first_name = str(data.get("firstName", "")).strip()
         last_name = str(data.get("lastName", "")).strip()
+        full_name = f"{first_name} {last_name}".strip()
+
         email = str(data.get("email", "")).strip().lower()
         password = data.get("password", "")
         confirm_password = data.get("confirmPassword", "")
 
-        min_len = int(
-            __import__("common").get_param(
-                f"/medislot/{os.environ.get('ENVIRONMENT', 'dev')}/auth/password-min-length"
-            )
-        )
-
         if (
-            not first_name
-            or len(first_name) > 100
-            or not last_name
-            or len(last_name) > 100
+            not first_name or len(first_name) > 100
+            or not last_name or len(last_name) > 100
+            or len(full_name) > 150
         ):
             return response(400, {
-                "message": "First name and last name are required",
+                "message": "Valid first name and last name are required",
                 "correlationId": cid
             })
 
@@ -55,6 +54,12 @@ def handler(event, context):
                 "message": "A valid email address is required",
                 "correlationId": cid
             })
+
+        min_len = int(
+            __import__("common").get_param(
+                f"/medislot/{os.environ.get('ENVIRONMENT', 'dev')}/auth/password-min-length"
+            )
+        )
 
         if (
             not isinstance(password, str)
@@ -71,15 +76,16 @@ def handler(event, context):
                 "correlationId": cid
             })
 
-        if not isinstance(confirm_password, str) or password != confirm_password:
+        if (
+            not isinstance(confirm_password, str)
+            or password != confirm_password
+        ):
             return response(400, {
                 "message": "Password and confirm password do not match",
                 "correlationId": cid
             })
 
-        # -----------------------------
-        # 2. Doctor professional details
-        # -----------------------------
+        # 2. Prepare role-specific details
         if role == "DOCTOR":
 
             licence_number = str(
@@ -90,9 +96,27 @@ def handler(event, context):
                 data.get("specialization", "")
             ).strip()
 
-            qualifications = str(
-                data.get("qualifications", "")
-            ).strip()
+            qualifications = data.get("qualifications", [])
+
+            # Accept either an array or comma-separated text
+            if isinstance(qualifications, str):
+                qualifications = [
+                    item.strip()
+                    for item in qualifications.split(",")
+                    if item.strip()
+                ]
+
+            if not isinstance(qualifications, list):
+                return response(400, {
+                    "message": "Qualifications must be a list",
+                    "correlationId": cid
+                })
+
+            qualifications = list(dict.fromkeys(
+                item.strip()
+                for item in qualifications
+                if isinstance(item, str) and item.strip()
+            ))
 
             hospital_name = str(
                 data.get("hospitalName", "")
@@ -102,11 +126,8 @@ def handler(event, context):
                 data.get("hospitalAddress", "")
             ).strip()
 
-            experience_years = data.get("experienceYears")
-
             languages_spoken = data.get("languagesSpoken")
 
-            # Validate required text fields
             required_fields = {
                 "licenceNumber": licence_number,
                 "specialization": specialization,
@@ -116,7 +137,7 @@ def handler(event, context):
             }
 
             missing_fields = [
-                field for field, value in required_fields.items()
+                key for key, value in required_fields.items()
                 if not value
             ]
 
@@ -130,16 +151,17 @@ def handler(event, context):
             if (
                 len(licence_number) > 100
                 or len(specialization) > 120
-                or len(qualifications) > 500
                 or len(hospital_name) > 200
                 or len(hospital_address) > 500
+                or len(json.dumps(qualifications)) > 10000
             ):
                 return response(400, {
-                    "message": "One or more professional fields exceed the allowed length",
+                    "message": "One or more professional fields exceed allowed limits",
                     "correlationId": cid
                 })
 
-            # Validate experience
+            experience_years = data.get("experienceYears")
+
             if (
                 isinstance(experience_years, bool)
                 or experience_years is None
@@ -153,7 +175,6 @@ def handler(event, context):
 
             experience_years = int(experience_years)
 
-            # Validate languages
             if (
                 not isinstance(languages_spoken, list)
                 or not languages_spoken
@@ -163,87 +184,90 @@ def handler(event, context):
                 )
             ):
                 return response(400, {
-                    "message": "languagesSpoken must be a non-empty list of languages",
+                    "message": "languagesSpoken must be a non-empty list",
                     "correlationId": cid
                 })
 
             languages_spoken = list(dict.fromkeys(
-                language.strip()
-                for language in languages_spoken
+                language.strip() for language in languages_spoken
             ))
 
-            # Existing optional fields retained
             consultation_fee = data.get("consultationFee")
 
             if consultation_fee is not None:
                 try:
                     consultation_fee = float(consultation_fee)
-
                     if consultation_fee < 0:
                         raise ValueError()
-
                 except (TypeError, ValueError):
                     return response(400, {
-                        "message": "consultationFee must be a non-negative number",
+                        "message": "consultationFee must be non-negative",
                         "correlationId": cid
                     })
 
             timezone = str(data.get("timezone", "UTC")).strip()
 
-        elif role == "PATIENT":
-            return response(400, {
-                "message": "Use the patient registration endpoint",
-                "correlationId": cid
-            })
+            bio = data.get("bio")
+
+            if bio is not None and not isinstance(bio, str):
+                return response(400, {
+                    "message": "bio must be text",
+                    "correlationId": cid
+                })
 
         else:
-            return response(500, {
-                "message": "Invalid registration configuration",
-                "correlationId": cid
-            })
+            # PATIENT details
+            date_of_birth = data.get("dateOfBirth") or None
+            gender = data.get("gender") or None
+            phone = data.get("phone") or None
+            address = data.get("address") or None
+            city = data.get("city") or None
+            emergency_contact = data.get("emergencyContact") or None
 
-        # -----------------------------
+            if gender is not None and len(str(gender)) > 20:
+                return response(400, {
+                    "message": "Gender exceeds allowed length",
+                    "correlationId": cid
+                })
+
+            if phone is not None and len(str(phone)) > 20:
+                return response(400, {
+                    "message": "Phone exceeds allowed length",
+                    "correlationId": cid
+                })
+
+            if emergency_contact is not None and len(str(emergency_contact)) > 20:
+                return response(400, {
+                    "message": "Emergency contact exceeds allowed length",
+                    "correlationId": cid
+                })
+
         # 3. Hash password
-        # -----------------------------
         hashed = bcrypt.hashpw(
             password.encode(),
             bcrypt.gensalt(rounds=12)
         ).decode()
 
-        # -----------------------------
-        # 4. Database connection
-        # -----------------------------
-        c = config()
-        conn = dbconn(c)
+        # 4. Connect to database
+        conn = dbconn(config())
 
-        try:
-            with conn.cursor() as cur:
+        with conn.cursor() as cur:
 
-                # Insert account details
-                cur.execute(
-                    """
-                    INSERT INTO users
-                    (
-                        first_name,
-                        last_name,
-                        email,
-                        password_hash,
-                        role
-                    )
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        first_name,
-                        last_name,
-                        email,
-                        hashed,
-                        role
-                    )
-                )
+            # IMPORTANT: users table has full_name,
+            # NOT first_name and last_name.
+            cur.execute(
+                """
+                INSERT INTO users
+                (email, password_hash, role, full_name)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (email, hashed, role, full_name)
+            )
 
-                uid = cur.lastrowid
+            uid = cur.lastrowid
 
-                # Insert doctor professional profile
+            if role == "DOCTOR":
+
                 cur.execute(
                     """
                     INSERT INTO doctor_profiles
@@ -268,40 +292,51 @@ def handler(event, context):
                     """,
                     (
                         uid,
-                        f"{first_name} {last_name}",
+                        full_name,
                         licence_number,
                         specialization,
-                        qualifications,
+                        json.dumps(qualifications),
                         experience_years,
                         hospital_name,
                         hospital_address,
                         json.dumps(languages_spoken),
-                        data.get("bio"),
+                        bio,
                         consultation_fee,
                         timezone
                     )
                 )
 
-            conn.commit()
+            else:
 
-        except Exception as e:
-            conn.rollback()
+                cur.execute(
+                    """
+                    INSERT INTO patients
+                    (
+                        user_id,
+                        full_name,
+                        date_of_birth,
+                        gender,
+                        phone,
+                        address,
+                        city,
+                        emergency_contact
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        uid,
+                        full_name,
+                        date_of_birth,
+                        gender,
+                        phone,
+                        address,
+                        city,
+                        emergency_contact
+                    )
+                )
 
-            if "Duplicate entry" in str(e):
-                return response(409, {
-                    "message": "Email or licence number is already registered",
-                    "correlationId": cid
-                })
+        conn.commit()
 
-            raise
-
-        finally:
-            conn.close()
-            conn = None
-
-        # -----------------------------
-        # 5. Success response
-        # -----------------------------
         emit(
             "info",
             "registration_succeeded",
@@ -313,19 +348,34 @@ def handler(event, context):
         return response(201, {
             "userId": str(uid),
             "role": role,
-            "message": "Doctor registration successful"
+            "message": f"{role.title()} registration successful"
         })
 
     except Exception as e:
-     if conn:
-         conn.rollback()
-         conn.close()
 
-     print(f"REGISTRATION ERROR: {type(e).__name__}: {str(e)}")
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
 
-     emit("error", "registration_failed", cid)
+        print(
+            f"REGISTRATION ERROR: {type(e).__name__}: {str(e)}"
+        )
 
-     return response(500, {
-         "message": "Internal server error",
-         "correlationId": cid
-     })
+        if "Duplicate entry" in str(e):
+            return response(409, {
+                "message": "Email or licence number is already registered",
+                "correlationId": cid
+            })
+
+        emit("error", "registration_failed", cid)
+
+        return response(500, {
+            "message": "Internal server error",
+            "correlationId": cid
+        })
+
+    finally:
+        if conn:
+            conn.close()
