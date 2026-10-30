@@ -316,14 +316,16 @@ def handler(event, context):
             "message": "Doctor registration successful"
         })
 
-    except Exception:
-        if conn:
-            conn.rollback()
-            conn.close()
+    except Exception as e:
+     if conn:
+         conn.rollback()
+         conn.close()
 
-        emit("error", "registration_failed", cid)
+     print(f"REGISTRATION ERROR: {type(e).__name__}: {str(e)}")
 
-        return response(500, {
-            "message": "Internal server error",
-            "correlationId": cid
-        })
+     emit("error", "registration_failed", cid)
+
+     return response(500, {
+         "message": "Internal server error",
+         "correlationId": cid
+     })
