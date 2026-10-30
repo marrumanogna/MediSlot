@@ -11,3 +11,7 @@ dist/
 build/
 *.zip
 .DS_Store
+
+dashboard/.env
+dashboard/flask_session/
+__pycache__/
