@@ -98,20 +98,23 @@ def test_invalid_timezone_rejected():
 
 def test_valid_profile_data_accepted():
     data = {
+        "licence_number": "TEST-LIC-1001",
         "specialization": "Cardiology",
-        "qualifications": "MBBS, MD",
+        "qualifications": ["MBBS", "MD"],
         "experience_years": 5,
         "consultation_fee": "500.00",
         "timezone": "Asia/Kolkata",
+        "hospital_name": "City Hospital",
+        "hospital_address": "Hyderabad, Telangana",
+        "languages_spoken": ["English", "Telugu"]
     }
-
     values, error = doctor_profile.validate_profile_data(
         data, "POST", "test-correlation"
     )
 
     assert error is None
     assert values["specialization"] == "Cardiology"
-    assert values["qualifications"] == "MBBS, MD"
+    assert values["qualifications"] == '["MBBS", "MD"]'
     assert values["experience_years"] == 5
     assert values["timezone"] == "Asia/Kolkata"
 
