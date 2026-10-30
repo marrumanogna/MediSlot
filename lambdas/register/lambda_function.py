@@ -253,15 +253,27 @@ def handler(event, context):
 
         with conn.cursor() as cur:
 
-            # IMPORTANT: users table has full_name,
-            # NOT first_name and last_name.
+            # Insert account details using the existing users schema.
+            # first_name and last_name are separate columns.
             cur.execute(
                 """
                 INSERT INTO users
-                (email, password_hash, role, full_name)
-                VALUES (%s, %s, %s, %s)
+                (
+                    first_name,
+                    last_name,
+                    email,
+                    password_hash,
+                    role
+                )
+                VALUES (%s, %s, %s, %s, %s)
                 """,
-                (email, hashed, role, full_name)
+                (
+                    first_name,
+                    last_name,
+                    email,
+                    hashed,
+                    role
+                )
             )
 
             uid = cur.lastrowid
