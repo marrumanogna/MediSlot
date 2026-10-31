@@ -826,6 +826,19 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BlackoutDatesFunction.Arn}/invocations'
 
+  BlackoutDateIdPutMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref BlackoutDateIdResource
+      HttpMethod: PUT
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BlackoutDatesFunction.Arn}/invocations'
+
   BlackoutDateIdDeleteMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -1005,6 +1018,7 @@ Resources:
       - BlackoutDatesPostMethod
       - BlackoutDateIdGetMethod
       - BlackoutDateIdDeleteMethod
+      - BlackoutDateIdPutMethod
       - DoctorScheduleGetMethod
     Properties:
       RestApiId: !Ref RestApi
