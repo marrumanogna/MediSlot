@@ -1,5 +1,9 @@
 
 from common import config, dbconn, response, body
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def handler(event, context):
@@ -119,4 +123,5 @@ def handler(event, context):
             conn.close()
 
     except Exception:
+        logger.exception("Availability patterns Lambda failed")
         return response(500, {"message": "Internal server error"})
