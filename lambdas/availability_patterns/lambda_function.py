@@ -44,11 +44,17 @@ def handler(event, context):
                             (doctor_id,),
                         )
                     rows = cur.fetchall()
-                    if pattern_id:
-                        if not rows:
-                            return response(404, {"message": "Availability pattern not found"})
-                        return response(200, rows[0])
-                    return response(200, {"items": rows})
+                if pattern_id:
+                    if not rows:
+                        return response(404, {"message": "Availability pattern not found"})
+
+                    result = dict(rows[0])
+
+                    for field in ("start_time", "end_time"):
+                        if result.get(field) is not None:
+                            result[field] = str(result[field])
+
+                    return response(200, result)
 
                 if method in ("POST", "PUT", "PATCH"):
                     if method == "POST":
